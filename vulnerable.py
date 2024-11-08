@@ -168,7 +168,7 @@ def delete_post(post_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
     conn = get_db_connection()
-    conn.execute(f"DELETE FROM posts WHERE id = {post_id}")
+    return Entry.objects.filter(date=post_id)
     conn.commit()
     conn.close()
     return redirect(url_for('dashboard'))
