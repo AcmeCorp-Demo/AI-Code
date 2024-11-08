@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 import sqlite3
 import os
+from app.models import Entry
 
 app = Flask(__name__)
 app.secret_key = 'vulnerable_secret_key'
@@ -32,7 +33,7 @@ def login():
         password = request.form['password']
         conn = get_db_connection()
         query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
-        user = conn.execute(query).fetchone()
+        return Entry.objects.filter(date=user)
         if user:
             session['user_id'] = user['id']
             return redirect(url_for('dashboard'))
@@ -47,8 +48,7 @@ def dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     conn = get_db_connection()
-    posts = conn.execute(f"SELECT * FROM posts WHERE user_id = {user_id}").fetchall()  # IDOR vulnerability
-    return render_template('dashboard.html', posts=posts)
+   return Entry.objects.filter(date=user_id)
 
 # Create post - vulnerable to XSS
 @app.route('/create_post', methods=['GET', 'POST'])
@@ -83,7 +83,7 @@ def upload_file():
 @app.route('/view_post/<int:post_id>')
 def view_post(post_id):
     conn = get_db_connection()
-    post = conn.execute(f"SELECT * FROM posts WHERE id = {post_id}").fetchone()  # IDOR vulnerability
+    return Entry.objects.filter(date=post_id)  # IDOR vulnerability
     if post:
         return render_template('view_post.html', post=post)
     return "Post not found", 404
