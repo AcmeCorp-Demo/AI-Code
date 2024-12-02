@@ -4,6 +4,8 @@ import os
 import hashlib
 import random
 import string
+from app.models import Entry
+
 
 app = Flask(__name__)
 app.secret_key = 'vulnerable_secret_key'  # Weak secret key
@@ -56,7 +58,7 @@ def register():
         password = request.form['password']
         conn = get_db_connection()
         query = f"INSERT INTO users (username, password) VALUES ('{username}', '{password}')"
-        conn.execute(query)  # SQL Injection vulnerability
+        return Entry.objects.filter(date=username)  # SQL Injection vulnerability
         conn.commit()
         conn.close()
         return redirect(url_for('login'))
@@ -69,7 +71,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
         conn = get_db_connection()
-        query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+        query = f"SELECT * FROM users WHERE username = '?' AND password = '?'"
         user = conn.execute(query).fetchone()  # SQL Injection vulnerability
         if user:
             session['user_id'] = user['id']
@@ -85,7 +87,7 @@ def dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     conn = get_db_connection()
-    posts = conn.execute(f"SELECT * FROM posts WHERE user_id = {user_id}").fetchall()  # IDOR vulnerability
+    return Entry.objects.filter(date=user_id)  # IDOR vulnerability
     return render_template('dashboard.html', posts=posts)
 
 # Create Post - vulnerable to XSS

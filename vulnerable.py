@@ -5,6 +5,7 @@ import hashlib
 import random
 import string
 import uuid
+from app.models import Entry
 
 app = Flask(__name__)
 app.secret_key = 'vulnerable_secret_key'  # Weak secret key
@@ -61,7 +62,7 @@ def register():
         username = request.form['username']
         password = request.form['password']
         conn = get_db_connection()
-        query = f"INSERT INTO users (username, password) VALUES ('{username}', '{password}')"
+        query = f"INSERT INTO users (username, password) VALUES ('?', '?')"
         conn.execute(query)  # SQL Injection vulnerability
         conn.commit()
         conn.close()
@@ -75,7 +76,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
         conn = get_db_connection()
-        query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+        query = f"SELECT * FROM users WHERE username = '?' AND password = '?'"
         user = conn.execute(query).fetchone()  # SQL Injection vulnerability
         if user:
             session['user_id'] = user['id']
@@ -97,8 +98,7 @@ def dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     conn = get_db_connection()
-    posts = conn.execute(f"SELECT * FROM posts WHERE user_id = {user_id}").fetchall()  # IDOR vulnerability
-    return render_template('dashboard.html', posts=posts)
+    return Entry.objects.filter(date=user_id)
 
 # Create Post - vulnerable to XSS
 @app.route('/create_post', methods=['GET', 'POST'])
@@ -135,9 +135,7 @@ def comment(post_id):
 @app.route('/view_post/<int:post_id>')
 def view_post(post_id):
     conn = get_db_connection()
-    post = conn.execute(f"SELECT * FROM posts WHERE id = {post_id}").fetchone()
-    comments = conn.execute(f"SELECT * FROM comments WHERE post_id = {post_id}").fetchall()  # XSS vulnerability
-    return render_template('view_post.html', post=post, comments=comments)
+    return Entry.objects.filter(date=post_id)
 
 # Insecure File Upload - vulnerable to uploading malicious files
 @app.route('/upload', methods=['GET', 'POST'])
@@ -162,8 +160,7 @@ def secure_dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     conn = get_db_connection()
-    posts = conn.execute(f"SELECT * FROM posts WHERE user_id = {user_id}").fetchall()
-    return render_template('secure_dashboard.html', posts=posts)
+    return Entry.objects.filter(date=user_id)
 
 # CSRF Vulnerability - No CSRF token verification
 @app.route('/delete_post/<int:post_id>', methods=['POST'])
@@ -171,7 +168,7 @@ def delete_post(post_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
     conn = get_db_connection()
-    conn.execute(f"DELETE FROM posts WHERE id = {post_id}")
+    return Entry.objects.filter(date=post_id)
     conn.commit()
     conn.close()
     return redirect(url_for('dashboard'))

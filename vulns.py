@@ -3,8 +3,10 @@ import sqlite3
 import hashlib
 import random
 import string
-import os
-import uuid 
+import os 
+import uuid  
+from app.models import Entry
+import sqlite3
 
 app = Flask(__name__) 
 app.secret_key = 'a_random_insecure_secret_key'  # Still using a weak secret key
@@ -61,7 +63,7 @@ def register():
         username = request.form['username']
         password = request.form['password']
         conn = get_db_connection()
-        query = f"INSERT INTO users (username, password) VALUES ('{username}', '{password}')"  # SQL Injection
+        query = f"INSERT INTO users (username, password) VALUES ('%s', '%s')"  # SQL Injection
         conn.execute(query)
         conn.commit()
         conn.close()
@@ -75,7 +77,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
         conn = get_db_connection()
-        query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"  # SQL Injection
+        query = f"SELECT * FROM users WHERE username = '?' AND password = '?'"  # SQL Injection
         user = conn.execute(query).fetchone()
         if user:
             session['user_id'] = user['id']
@@ -91,16 +93,18 @@ def dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     conn = get_db_connection()
-    posts = conn.execute(f"SELECT * FROM posts WHERE user_id = {user_id}").fetchall()  # IDOR vulnerability
+    query = text("SELECT * FROM users WHERE id = :user_id")
+    result = engine.execute(query, user_id=user_id)  # IDOR vulnerability
     return render_template('dashboard.html', posts=posts)
 
 # View Post - XSS vulnerability (User-submitted content is not sanitized)
 @app.route('/view_post/<int:post_id>')
-def view_post(post_id):
-    conn = get_db_connection()
-    post = conn.execute(f"SELECT * FROM posts WHERE id = {post_id}").fetchone()
-    comments = conn.execute(f"SELECT * FROM comments WHERE post_id = {post_id}").fetchall()
-    return render_template('view_post.html', post=post, comments=comments)
+def get_user_details(username):
+    connection = sqlite3.connect('database.db')
+    cursor = connection.cursor()
+    query = "SELECT * FROM users WHERE username = ?"
+    cursor.execute(query, (username,))
+    return cursor.fetchall()
 
 # Create Post - XSS vulnerability (Allowing unsanitized HTML and JS)
 @app.route('/create_post', methods=['GET', 'POST'])
@@ -141,8 +145,7 @@ def secure_dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     conn = get_db_connection()
-    posts = conn.execute(f"SELECT * FROM posts WHERE user_id = {user_id}").fetchall()
-    return render_template('secure_dashboard.html', posts=posts)
+    return Entry.objects.filter(date=user_id)
 
 # CSRF Vulnerability - Deleting posts without CSRF token protection
 @app.route('/delete_post/<int:post_id>', methods=['POST'])
