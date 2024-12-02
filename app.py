@@ -87,7 +87,8 @@ def view_post(post_id):
     if post:
         return render_template('view_post.html', post=post)
     return "Post not found", 404
+ app.run(debug=True)
 
 if __name__ == '__main__':
     init_db()
-   
+    app.run(debug=True)
